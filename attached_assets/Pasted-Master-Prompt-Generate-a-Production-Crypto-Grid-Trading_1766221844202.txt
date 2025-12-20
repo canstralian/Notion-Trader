@@ -1,0 +1,142 @@
+Master Prompt: Generate a Production Crypto Grid Trading System + Dashboard (Integrate with Existing Stack)
+
+You are generating a production-grade, multi-grid crypto trading system with real-time monitoring and risk-first decision support, designed to plug into an existing infrastructure (not a greenfield prototype). Use only the parameters provided below (treat them as “live config”), and design the code so configs can be loaded from DB/env without code edits.
+
+Existing Stack (must integrate)
+	•	Exchange: Bybit API v5 (REST + WebSocket)
+	•	Backend: FastAPI + PostgreSQL + TimescaleDB + Redis
+	•	Indicators/Signals: TradingView Pine Script v5 → webhooks
+	•	Active capital: ~34K USDT across BTC, MNT, DOGE, PEPE
+	•	Target APR: 80–120% with strict risk controls
+
+⸻
+
+System Requirements (Architecture)
+
+1) Data Ingestion Pipeline (fail fast, log everything)
+	•	Stream real-time OHLCV from Bybit WebSocket for 15m and 1H candles with sub-second latency.
+	•	Validate data before storage:
+	•	OHLC relationship checks, malformed payload rejection, spike detection.
+	•	Store in TimescaleDB hypertables with compression enabled.
+	•	Reliability/health:
+	•	WebSocket uptime >99%, data completeness >95%, error rate <5%.
+	•	Exponential backoff reconnection with state recovery.
+	•	Implementation: asyncio-based WebSocket manager, robust auth, connection monitoring, structured logs.
+
+2) Multi-Grid Bot Orchestration (capital allocation + reconciliation)
+
+Manage multiple grids concurrently with position and order reconciliation:
+	•	Use REST snapshot + WebSocket deltas for state.
+	•	Fee-aware order sizing: target fees <0.04% per trade.
+	•	Inventory drift monitoring: alert if >5% away from intended split (e.g., 50/50 or specified).
+	•	“Friday harvest protocol”: if monthly profit >5%, perform configured harvest action (profit take/redeploy).
+
+Live grid configs (treat as source-of-truth):
+	•	BTC/USDT: 95.5K–99K range, 12 grids, 25K USDT, arithmetic spacing, 60/40 USDT/BTC split
+	•	MNT/USDT: 1.04–1.12 range, 15 grids, 6K USDT, stop-loss at 1.015
+	•	DOGE/USDT: 0.129–0.145 range, 18 grids, mean reversion with BTC driver filter
+	•	PEPE/USDT: 0.00000416–0.00000479, 24 grids, 3K USDT, BTC stability filter is critical
+
+Yield waterfall logic (automated profit routing):
+	•	If BTC profit >5%, route 30% to TON grid if TON < $1.55 (TON is optional/conditional; implement as a strategy hook even if TON is not currently active).
+	•	After TON accumulation complete → redirect to PEPE or other configured opportunities.
+	•	Ensure routing is rules-based, auditable, and reversible.
+
+3) TradingView Alert Engine (Config → Generate → Execute → Feedback)
+
+Implement webhook-driven signals from TradingView:
+	•	Per pair: 2 Long Zones (LZ1, LZ2) and 2 Short Zones (SZ1, SZ2), volatility trigger threshold, and optional driver asset filter (BTC stability) for alts.
+	•	Webhook flow: TradingView → FastAPI /tv-alert → verify → validate → act/log.
+	•	Track alert quality: false positive rate <20%, zone performance logging, and automatic recalibration based on outcomes.
+	•	Support “multi-pair single-pane” monitoring concept (status, volatility, driver stability, clean signals).
+
+4) Risk Management & Circuit Breakers (no discretion)
+
+Hard kill-switches and regime logic:
+	•	Stop-loss triggers:
+	•	BTC < 94,800
+	•	MNT < 1.015
+	•	PEPE < 0.00000395
+	•	On trigger: auto-liquidation (if configured) + bot pause + incident log.
+	•	Kill switch (ANY triggers):
+	•	2+ volatility circuit breakers triggered
+	•	API error rate >2%
+	•	WebSocket disconnect >60s
+	•	Total equity < -30% from initial capital baseline
+	•	Mode switching:
+	•	Trend breakout: BTC >99,500 with volume confirmation → hold / switch to trend-following mode
+	•	Volatility expansion: ATR(14) >2,500 → widen range, reduce grids
+	•	BTC dump (alts): driver stability fails → pause new entries
+
+5) Feature Engineering (“The Edge”) — statistical features only
+
+Compute and persist real-time features (no subjective indicators):
+	•	Price: ATR(14), ATR%, distance to EMA50/EMA200, range position, candle body ratio
+	•	Volatility: rolling vol (20-period log return std), burst ratio, range expansion vs 20-period avg
+	•	Volume: volume ratio vs 20-SMA, distance from VWAP(20)
+	•	Risk outputs for dashboard: ATR-based target/stop, risk-reward, distance to swing S/R
+
+6) Dashboard UI + Control Plane (Streamlit or React + FastAPI)
+
+Real-time operational panels:
+	•	Grid status: active/paused/error, inventory ratios, fill frequency target 8–15/day
+	•	PnL: realized/unrealized, 24h performance, weekly harvest eligibility
+	•	Alerts: Critical/Warning/Info, live zone breaches, driver stability
+	•	Risk: distance to stop-loss, underwater alerts, circuit breaker state
+
+FastAPI control endpoints:
+	•	POST /kill
+	•	POST /pause/{symbol}
+	•	POST /resume
+	•	POST /deploy
+	•	POST /rebalance
+	•	GET /status
+
+⸻
+
+Engineering Standards (non-negotiable)
+	•	Async/await for all I/O; graceful degradation everywhere.
+	•	Retries: exponential backoff, max 3 attempts; idempotent where needed.
+	•	Structured logging + correlation IDs; metrics for health/SLA.
+	•	Type hints everywhere (Python + TS interfaces if applicable).
+	•	Rate limiting respecting exchange caps (configurable; default 10 calls/sec).
+	•	DB pooling (asyncpg), Redis caching with 5s TTL for hot real-time data.
+	•	Security: env var secrets, HMAC signing, webhook verification, parameterized SQL.
+	•	Tests:
+	•	Unit tests for feature calcs
+	•	Integration tests for WS parsing/handling
+	•	Mock exchange for grid deployment tests
+	•	Load tests: p99 latency <500ms
+
+⸻
+
+Success Metrics
+
+Operational:
+	•	Data completeness >95%, WS uptime >99%, feature lag <10s, API p99 <500ms, error rate <5%
+Trading:
+	•	Fill frequency 8–15/day per bot, realized capture >85% of theoretical, false alerts <20%, zone-entry win rate >50%, monthly profit >3% (target 5%+)
+
+⸻
+
+Deliverables (generate these files)
+
+Primary (Python + deployment):
+	1.	data_ingestion_service.py
+	2.	grid_bot_controller.py
+	3.	feature_computer.py
+	4.	dashboard_api.py
+	5.	alert_handler.py
+	6.	risk_manager.py
+	7.	database_schema.sql (TimescaleDB schema)
+	8.	docker-compose.yml (full stack)
+	9.	streamlit_dashboard.py (or React frontend scaffold + API integration)
+	10.	.env.example
+
+Secondary:
+	•	Pine Script templates for BTC/PEPE/DOGE/MNT with zone parameters
+	•	Google Apps Script for config generation (e.g., Sheets → Pine arrays)
+	•	Grafana dashboard JSON
+	•	Deployment guide (AWS/DigitalOcean)
+
+Produce code that is production-ready, consistent with this spec, and structured so live parameters come from config/DB rather than hardcoded constants.
