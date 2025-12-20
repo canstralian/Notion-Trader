@@ -1,15 +1,28 @@
 import streamlit as st
 import pandas as pd
+import requests
+import asyncio
 from datetime import datetime, timedelta
-from notion_service import NotionTradeService
+from typing import Dict, Optional
+
+try:
+    from notion_service import NotionTradeService
+except:
+    NotionTradeService = None
+
 from crypto_api import (
     get_current_prices, get_market_data, get_coin_history,
     get_trending_coins, format_currency, format_percent, COIN_MAP
 )
+from config.grid_configs import DEFAULT_GRID_CONFIGS, RISK_THRESHOLDS
+from services.bybit_client import get_bybit_client, MockBybitClient
+from services.grid_engine import GridEngine
+from services.risk_manager import RiskManager
+from services.data_ingestion import DataIngestionService
 
 st.set_page_config(
-    page_title="Crypto Trading Dashboard",
-    page_icon="📈",
+    page_title="Crypto Trading Bot",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -70,32 +83,45 @@ st.markdown("""
         border-bottom: 1px solid #E8E7E4;
     }
     
-    .trade-row {
+    .grid-card {
         background-color: #F7F6F3;
-        border-radius: 6px;
-        padding: 12px 16px;
-        margin: 6px 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 8px 0;
+        border: 1px solid #E8E7E4;
     }
     
-    .coin-badge {
-        display: inline-block;
+    .status-running {
+        color: #0F7B6C;
+        font-weight: 600;
+    }
+    
+    .status-stopped {
+        color: #E03E3E;
+        font-weight: 600;
+    }
+    
+    .status-paused {
+        color: #FFB02E;
+        font-weight: 600;
+    }
+    
+    .buy-badge {
+        background-color: rgba(15, 123, 108, 0.1);
+        color: #0F7B6C;
         padding: 4px 12px;
         border-radius: 4px;
         font-weight: 500;
         font-size: 12px;
     }
     
-    .buy-badge {
-        background-color: rgba(15, 123, 108, 0.1);
-        color: #0F7B6C;
-    }
-    
     .sell-badge {
         background-color: rgba(224, 62, 62, 0.1);
         color: #E03E3E;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-weight: 500;
+        font-size: 12px;
     }
     
     .stButton > button {
@@ -112,371 +138,388 @@ st.markdown("""
         background-color: #2596BE;
     }
     
-    .sidebar .stSelectbox label, .sidebar .stNumberInput label {
-        color: #37352F;
-        font-weight: 500;
-    }
-    
-    div[data-testid="stDataFrame"] {
-        border: 1px solid #E8E7E4;
-        border-radius: 8px;
+    .danger-button > button {
+        background-color: #E03E3E !important;
     }
     
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
-        background-color: #F7F6F3;
-        padding: 4px;
-        border-radius: 8px;
+        background-color: transparent;
     }
     
     .stTabs [data-baseweb="tab"] {
+        background-color: #F7F6F3;
         border-radius: 6px;
+        padding: 8px 16px;
         color: #37352F;
-        font-weight: 500;
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: #FFFFFF;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        background-color: #2EAADC !important;
+        color: white !important;
     }
     
-    .price-up {
-        color: #0F7B6C;
-    }
-    
-    .price-down {
-        color: #E03E3E;
-    }
-    
-    h1 {
-        color: #000000;
-        font-weight: 700;
-    }
-    
-    h2, h3 {
-        color: #000000;
+    div[data-testid="stMetricValue"] {
+        font-size: 24px;
         font-weight: 600;
-    }
-    
-    .stMetric label {
-        color: #37352F !important;
-    }
-    
-    .stMetric [data-testid="stMetricValue"] {
-        color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-def get_notion_service():
-    if 'notion_service' not in st.session_state:
-        service = NotionTradeService()
-        try:
-            service.connect()
-            force_create = st.session_state.get('force_create_databases', False)
-            service.find_or_create_databases(force_create=force_create)
-            st.session_state['notion_service'] = service
-            st.session_state['force_create_databases'] = False
-        except Exception as e:
-            st.error(f"Failed to connect to Notion: {e}")
-            return NotionTradeService()
-    return st.session_state['notion_service']
+@st.cache_resource
+def get_grid_engine():
+    engine = GridEngine()
+    engine.initialize_all_grids()
+    return engine
 
-def reset_notion_service(force_create: bool = False):
-    if 'notion_service' in st.session_state:
-        del st.session_state['notion_service']
-    st.session_state['force_create_databases'] = force_create
+@st.cache_resource
+def get_risk_manager():
+    return RiskManager()
 
-def render_market_overview():
-    st.markdown('<div class="section-header">Market Overview</div>', unsafe_allow_html=True)
-    
-    market_data = get_market_data()
-    
-    if not market_data:
-        st.warning("Unable to fetch market data. Please try again later.")
-        return
-    
-    cols = st.columns(5)
-    for i, coin in enumerate(market_data[:5]):
-        with cols[i]:
-            change = coin.get('change_24h', 0) or 0
-            delta_color = "normal" if change >= 0 else "inverse"
-            st.metric(
-                label=f"{coin['symbol']}",
-                value=format_currency(coin['price']),
-                delta=format_percent(change),
-                delta_color=delta_color
-            )
-
-def render_portfolio_summary(notion_service):
-    st.markdown('<div class="section-header">Portfolio Summary</div>', unsafe_allow_html=True)
-    
+def get_api_status() -> Dict:
     try:
-        portfolio = notion_service.get_portfolio()
-        prices = get_current_prices()
-        
-        if prices:
-            notion_service.update_portfolio_values(prices)
-            portfolio = notion_service.get_portfolio()
+        response = requests.get("http://localhost:8000/api/status", timeout=2)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        pass
+    return None
+
+def call_api(endpoint: str, method: str = "GET", data: Dict = None) -> Optional[Dict]:
+    try:
+        url = f"http://localhost:8000{endpoint}"
+        if method == "GET":
+            response = requests.get(url, timeout=5)
+        else:
+            response = requests.post(url, json=data, timeout=5)
+        if response.status_code == 200:
+            return response.json()
     except Exception as e:
-        st.warning(f"Could not load portfolio: {e}")
-        portfolio = []
+        st.error(f"API error: {e}")
+    return None
+
+def render_grid_status():
+    st.markdown('<div class="section-header">Grid Trading Status</div>', unsafe_allow_html=True)
     
-    total_invested = sum(h.get('total_invested', 0) or 0 for h in portfolio)
-    total_value = sum(h.get('current_value', 0) or 0 for h in portfolio)
-    total_pnl = total_value - total_invested
-    total_pnl_pct = (total_pnl / total_invested * 100) if total_invested > 0 else 0
+    engine = get_grid_engine()
+    
+    cols = st.columns(4)
+    
+    for idx, (symbol, config) in enumerate(DEFAULT_GRID_CONFIGS.items()):
+        with cols[idx % 4]:
+            status = engine.get_grid_status(symbol)
+            if status:
+                status_class = f"status-{status['status']}"
+                
+                st.markdown(f"""
+                <div class="grid-card">
+                    <h4 style="margin: 0 0 8px 0;">{symbol.replace('USDT', '/USDT')}</h4>
+                    <p class="{status_class}" style="margin: 0;">Status: {status['status'].upper()}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.metric(
+                    "Current Price",
+                    f"${status['current_price']:,.8f}" if status['current_price'] < 1 else f"${status['current_price']:,.2f}",
+                    delta=None
+                )
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Buys", status['total_buys'])
+                with col2:
+                    st.metric("Sells", status['total_sells'])
+                
+                st.metric("Realized P/L", f"${status['realized_pnl']:,.2f}")
+                
+                st.caption(f"Range: ${config.lower_price:,.8f}" if config.lower_price < 1 else f"Range: ${config.lower_price:,.2f} - ${config.upper_price:,.2f}")
+                st.caption(f"Grids: {config.grid_count} | Investment: ${config.total_investment:,.0f}")
+
+def render_risk_dashboard():
+    st.markdown('<div class="section-header">Risk Management</div>', unsafe_allow_html=True)
+    
+    risk = get_risk_manager()
+    status = risk.get_status()
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Total Invested", format_currency(total_invested))
+        delta_color = "normal" if status['drawdown_percent'] < 10 else "inverse"
+        st.metric(
+            "Drawdown",
+            f"{status['drawdown_percent']:.1f}%",
+            delta=f"Max: {RISK_THRESHOLDS['max_drawdown_percent']}%",
+            delta_color=delta_color
+        )
+    
     with col2:
-        st.metric("Current Value", format_currency(total_value))
+        st.metric(
+            "Total Equity",
+            f"${status['total_equity']:,.2f}",
+            delta=f"Initial: ${status['initial_equity']:,.0f}"
+        )
+    
     with col3:
-        delta_color = "normal" if total_pnl >= 0 else "inverse"
-        st.metric("Total P/L", format_currency(total_pnl), delta=format_percent(total_pnl_pct), delta_color=delta_color)
+        st.metric(
+            "API Error Rate",
+            f"{status['api_error_rate']:.2f}%",
+            delta=f"Max: {RISK_THRESHOLDS['max_api_error_rate']}%"
+        )
+    
     with col4:
-        st.metric("Holdings", str(len([h for h in portfolio if h.get('quantity', 0) > 0])))
-    
-    if portfolio:
-        st.markdown("#### Holdings")
-        holdings_data = []
-        for h in portfolio:
-            if h.get('quantity', 0) > 0:
-                holdings_data.append({
-                    "Coin": h.get('coin', ''),
-                    "Quantity": f"{h.get('quantity', 0):.6f}",
-                    "Avg Price": format_currency(h.get('avg_buy_price', 0)),
-                    "Current Value": format_currency(h.get('current_value', 0)),
-                    "P/L": format_currency(h.get('profit_loss', 0)),
-                    "P/L %": format_percent(h.get('profit_loss_pct', 0) * 100)
-                })
-        
-        if holdings_data:
-            df = pd.DataFrame(holdings_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+        if status['kill_switch_triggered']:
+            st.error(f"KILL SWITCH: {status['kill_switch_reason']}")
+        elif status['potential_kill_reason']:
+            st.warning(f"Warning: {status['potential_kill_reason']}")
+        else:
+            st.success("System Healthy")
 
-def render_trade_form(notion_service):
-    st.markdown('<div class="section-header">Log Trade</div>', unsafe_allow_html=True)
+def render_controls():
+    st.markdown('<div class="section-header">Bot Controls</div>', unsafe_allow_html=True)
     
-    with st.form("trade_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            coin = st.selectbox("Coin", list(COIN_MAP.keys()))
-            trade_type = st.selectbox("Type", ["Buy", "Sell"])
-            price = st.number_input("Price (USD)", min_value=0.0, format="%.6f")
-        
-        with col2:
-            quantity = st.number_input("Quantity", min_value=0.0, format="%.8f")
-            trade_date = st.date_input("Date", value=datetime.now())
-            notes = st.text_input("Notes (optional)")
-        
-        total = price * quantity
-        st.markdown(f"**Total:** {format_currency(total)}")
-        
-        submitted = st.form_submit_button("Log Trade", use_container_width=True)
-        
-        if submitted:
-            if price > 0 and quantity > 0:
-                try:
-                    notion_service.log_trade(
-                        coin=coin,
-                        trade_type=trade_type,
-                        price=price,
-                        quantity=quantity,
-                        notes=notes,
-                        date=trade_date.strftime("%Y-%m-%d")
-                    )
-                    st.success(f"Trade logged: {trade_type} {quantity} {coin} at {format_currency(price)}")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if st.button("Start All Grids", use_container_width=True):
+            for symbol in DEFAULT_GRID_CONFIGS:
+                call_api(f"/api/grids/{symbol}/start", "POST")
+            st.success("Started all grids")
+            st.rerun()
+    
+    with col2:
+        if st.button("Pause All", use_container_width=True):
+            call_api("/api/pause", "POST")
+            st.info("Paused all grids")
+            st.rerun()
+    
+    with col3:
+        if st.button("Resume All", use_container_width=True):
+            call_api("/api/resume", "POST")
+            st.success("Resumed all grids")
+            st.rerun()
+    
+    with col4:
+        st.markdown('<div class="danger-button">', unsafe_allow_html=True)
+        if st.button("KILL SWITCH", use_container_width=True, type="primary"):
+            call_api("/api/kill", "POST")
+            st.error("KILL SWITCH ACTIVATED - All trading stopped")
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.divider()
+    
+    st.markdown("**Per-Grid Controls**")
+    cols = st.columns(4)
+    
+    for idx, symbol in enumerate(DEFAULT_GRID_CONFIGS):
+        with cols[idx]:
+            st.caption(symbol)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Start", key=f"start_{symbol}", use_container_width=True):
+                    call_api(f"/api/grids/{symbol}/start", "POST")
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to log trade: {e}")
-            else:
-                st.warning("Please enter valid price and quantity")
+            with c2:
+                if st.button("Pause", key=f"pause_{symbol}", use_container_width=True):
+                    call_api(f"/api/pause/{symbol}", "POST")
+                    st.rerun()
 
-def render_trade_history(notion_service):
-    st.markdown('<div class="section-header">Trade History</div>', unsafe_allow_html=True)
+def render_market_overview():
+    st.markdown('<div class="section-header">Market Overview</div>', unsafe_allow_html=True)
     
-    try:
-        trades = notion_service.get_trades()
-    except Exception as e:
-        st.warning(f"Could not load trades: {e}")
-        trades = []
+    prices = get_current_prices()
+    market_data_list = get_market_data()
     
-    if trades:
-        trades_data = []
-        for t in trades:
-            trades_data.append({
-                "Date": t.get('date', ''),
-                "Type": t.get('type', ''),
-                "Coin": t.get('coin', ''),
-                "Quantity": f"{t.get('quantity', 0):.6f}",
-                "Price": format_currency(t.get('price', 0)),
-                "Total": format_currency(t.get('total', 0)),
-                "Status": t.get('status', ''),
-                "Notes": t.get('notes', '')
-            })
+    market_data = {}
+    if market_data_list:
+        for item in market_data_list:
+            symbol = item.get('symbol', '').upper()
+            market_data[symbol] = item
+    
+    if prices:
+        trading_symbols = ["BTC", "DOGE"]
+        other_symbols = [s for s in prices.keys() if s not in trading_symbols]
         
-        df = pd.DataFrame(trades_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        cols = st.columns(len(trading_symbols) + min(4, len(other_symbols)))
+        
+        for idx, coin in enumerate(trading_symbols + other_symbols[:4]):
+            with cols[idx]:
+                price = prices.get(coin, 0)
+                data = market_data.get(coin, {})
+                change = data.get('price_change_24h', 0)
+                
+                st.metric(
+                    coin,
+                    format_currency(price),
+                    delta=format_percent(change) if change else None,
+                    delta_color="normal" if change >= 0 else "inverse"
+                )
     else:
-        st.info("No trades logged yet. Use the form above to log your first trade!")
+        st.warning("Unable to fetch market data")
 
-def render_strategies(notion_service):
-    st.markdown('<div class="section-header">Trading Strategies</div>', unsafe_allow_html=True)
+def render_grid_config():
+    st.markdown('<div class="section-header">Grid Configuration</div>', unsafe_allow_html=True)
     
-    with st.expander("Add New Strategy", expanded=False):
-        with st.form("strategy_form", clear_on_submit=True):
-            name = st.text_input("Strategy Name")
-            description = st.text_area("Description")
-            target_coins = st.multiselect("Target Coins", list(COIN_MAP.keys()))
-            risk_level = st.selectbox("Risk Level", ["Low", "Medium", "High"])
-            notes = st.text_input("Notes (optional)")
+    for symbol, config in DEFAULT_GRID_CONFIGS.items():
+        with st.expander(f"{symbol} Configuration"):
+            col1, col2 = st.columns(2)
             
-            if st.form_submit_button("Add Strategy", use_container_width=True):
-                if name and description:
-                    try:
-                        notion_service.add_strategy(
-                            name=name,
-                            description=description,
-                            target_coins=target_coins,
-                            risk_level=risk_level,
-                            notes=notes
-                        )
-                        st.success(f"Strategy '{name}' added successfully!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed to add strategy: {e}")
-                else:
-                    st.warning("Please enter strategy name and description")
+            with col1:
+                st.text_input("Lower Price", value=f"{config.lower_price}", key=f"lower_{symbol}", disabled=True)
+                st.text_input("Upper Price", value=f"{config.upper_price}", key=f"upper_{symbol}", disabled=True)
+                st.text_input("Grid Count", value=f"{config.grid_count}", key=f"count_{symbol}", disabled=True)
+            
+            with col2:
+                st.text_input("Investment", value=f"${config.total_investment:,.0f}", key=f"invest_{symbol}", disabled=True)
+                st.text_input("Grid Spacing", value=f"{config.grid_spacing:.8f}", key=f"spacing_{symbol}", disabled=True)
+                st.text_input("Stop Loss", value=f"{config.stop_loss or 'None'}", key=f"sl_{symbol}", disabled=True)
+            
+            grid_prices = config.get_grid_prices()
+            st.caption(f"Grid Levels: {', '.join([f'{p:.8f}' if p < 1 else f'{p:.2f}' for p in grid_prices[:5]])}...")
+
+def render_pnl_summary():
+    st.markdown('<div class="section-header">P/L Summary</div>', unsafe_allow_html=True)
+    
+    engine = get_grid_engine()
+    
+    total_pnl = 0
+    total_buys = 0
+    total_sells = 0
+    
+    data = []
+    for symbol in DEFAULT_GRID_CONFIGS:
+        status = engine.get_grid_status(symbol)
+        if status:
+            total_pnl += status['realized_pnl']
+            total_buys += status['total_buys']
+            total_sells += status['total_sells']
+            data.append({
+                "Symbol": symbol,
+                "Status": status['status'],
+                "Buys": status['total_buys'],
+                "Sells": status['total_sells'],
+                "P/L": f"${status['realized_pnl']:,.2f}"
+            })
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total P/L", f"${total_pnl:,.2f}")
+    with col2:
+        st.metric("Total Buys", total_buys)
+    with col3:
+        st.metric("Total Sells", total_sells)
+    
+    if data:
+        st.dataframe(pd.DataFrame(data), use_container_width=True, hide_index=True)
+
+def render_notion_trades():
+    st.markdown('<div class="section-header">Notion Trade Log (Legacy)</div>', unsafe_allow_html=True)
+    
+    if NotionTradeService is None:
+        st.info("Notion integration not available")
+        return
     
     try:
-        strategies = notion_service.get_strategies()
-    except Exception as e:
-        st.warning(f"Could not load strategies: {e}")
-        strategies = []
-    
-    if strategies:
-        for s in strategies:
-            with st.container():
-                col1, col2, col3 = st.columns([3, 1, 1])
-                with col1:
-                    st.markdown(f"**{s.get('name', 'Unnamed')}**")
-                    st.caption(s.get('description', ''))
-                with col2:
-                    coins = ", ".join(s.get('target_coins', []))
-                    st.caption(f"Coins: {coins}")
-                with col3:
-                    risk = s.get('risk_level', 'Unknown')
-                    status = s.get('status', 'Unknown')
-                    risk_color = {"Low": "🟢", "Medium": "🟡", "High": "🔴"}.get(risk, "⚪")
-                    st.caption(f"{risk_color} {risk} | {status}")
-                st.divider()
-    else:
-        st.info("No strategies defined yet. Add your first trading strategy!")
-
-def render_market_details():
-    st.markdown('<div class="section-header">Market Details</div>', unsafe_allow_html=True)
-    
-    market_data = get_market_data()
-    
-    if market_data:
-        data = []
-        for coin in market_data:
-            data.append({
-                "Coin": f"{coin['name']} ({coin['symbol']})",
-                "Price": format_currency(coin['price']),
-                "1h": format_percent(coin.get('change_1h', 0)),
-                "24h": format_percent(coin.get('change_24h', 0)),
-                "7d": format_percent(coin.get('change_7d', 0)),
-                "Market Cap": format_currency(coin.get('market_cap', 0)),
-                "Volume 24h": format_currency(coin.get('volume_24h', 0)),
-                "24h High": format_currency(coin.get('high_24h', 0)),
-                "24h Low": format_currency(coin.get('low_24h', 0))
-            })
+        if 'notion_service' not in st.session_state:
+            service = NotionTradeService()
+            service.connect()
+            service.find_or_create_databases()
+            st.session_state['notion_service'] = service
         
-        df = pd.DataFrame(data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    st.markdown("#### Trending Coins")
-    trending = get_trending_coins()
-    
-    if trending:
-        cols = st.columns(5)
-        for i, coin in enumerate(trending[:5]):
-            with cols[i]:
-                st.markdown(f"**{coin['symbol']}**")
-                st.caption(f"{coin['name']}")
-                st.caption(f"Rank #{coin.get('market_cap_rank', 'N/A')}")
+        service = st.session_state['notion_service']
+        
+        if service.client:
+            st.success("Notion Connected")
+        else:
+            st.warning("Notion not connected")
+    except Exception as e:
+        st.error(f"Notion error: {e}")
 
 def main():
-    st.title("📈 Crypto Trading Dashboard")
-    st.caption("Track your trades, portfolio, and strategies with Notion integration")
+    st.title("🤖 Crypto Trading Bot")
+    st.caption("Multi-grid automated trading system with risk management")
     
-    notion_service = get_notion_service()
-    
-    tab1, tab2, tab3, tab4 = st.tabs(["Dashboard", "Trade", "Market", "Strategies"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Dashboard", "Controls", "Grids", "Market", "Settings"])
     
     with tab1:
-        render_market_overview()
-        render_portfolio_summary(notion_service)
-        render_trade_history(notion_service)
+        render_risk_dashboard()
+        render_grid_status()
+        render_pnl_summary()
     
     with tab2:
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            render_trade_form(notion_service)
-        with col2:
-            st.markdown('<div class="section-header">Quick Prices</div>', unsafe_allow_html=True)
-            prices = get_current_prices()
-            if prices:
-                for coin, price in prices.items():
-                    st.metric(coin, format_currency(price))
+        render_controls()
     
     with tab3:
-        render_market_details()
+        render_grid_config()
     
     with tab4:
-        render_strategies(notion_service)
+        render_market_overview()
+        
+        st.markdown('<div class="section-header">Trending Coins</div>', unsafe_allow_html=True)
+        trending = get_trending_coins()
+        if trending:
+            cols = st.columns(5)
+            for idx, coin in enumerate(trending[:5]):
+                with cols[idx]:
+                    st.markdown(f"**{coin.get('name', 'Unknown')}**")
+                    st.caption(coin.get('symbol', ''))
+    
+    with tab5:
+        st.markdown('<div class="section-header">System Settings</div>', unsafe_allow_html=True)
+        
+        st.subheader("Risk Thresholds")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.number_input("Max Drawdown %", value=RISK_THRESHOLDS['max_drawdown_percent'], disabled=True)
+            st.number_input("Max API Error Rate %", value=RISK_THRESHOLDS['max_api_error_rate'], disabled=True)
+        with col2:
+            st.number_input("Volatility Breaker Count", value=RISK_THRESHOLDS['volatility_breaker_count'], disabled=True)
+            st.number_input("Max Position Size %", value=RISK_THRESHOLDS['max_position_size_percent'], disabled=True)
+        
+        st.divider()
+        
+        render_notion_trades()
     
     with st.sidebar:
+        st.markdown("### System Status")
+        
+        api_status = get_api_status()
+        if api_status:
+            st.success("API: Connected")
+        else:
+            st.warning("API: Offline (using local engine)")
+        
+        bybit_client = get_bybit_client()
+        if isinstance(bybit_client, MockBybitClient):
+            st.info("Bybit: Mock Mode")
+        else:
+            st.success("Bybit: Connected")
+        
+        st.divider()
+        
         st.markdown("### Quick Actions")
         
         if st.button("Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
         
-        if st.button("Reset Notion Connection", use_container_width=True):
-            reset_notion_service(force_create=False)
-            st.rerun()
-        
-        if st.button("Create New Databases", use_container_width=True, type="secondary"):
-            reset_notion_service(force_create=True)
+        if st.button("Rebalance All", use_container_width=True):
+            call_api("/api/rebalance", "POST")
+            st.success("Rebalanced")
             st.rerun()
         
         st.divider()
         
-        st.markdown("### Connection Status")
-        try:
-            if notion_service.client:
-                notion_service.client.users.me()
-                st.success("Notion: Connected")
-                if notion_service.trades_db_id:
-                    st.caption(f"Databases: Ready")
-                else:
-                    st.warning("Databases: Not initialized")
-            else:
-                st.error("Notion: Not connected")
-        except:
-            st.error("Notion: Disconnected")
+        st.markdown("### Capital Allocation")
+        for symbol, config in DEFAULT_GRID_CONFIGS.items():
+            st.caption(f"{symbol}: ${config.total_investment:,.0f}")
+        st.caption(f"**Total: $34,000**")
         
         st.divider()
         
         st.markdown("### About")
-        st.caption("Cryptocurrency trading dashboard with Notion integration for persistent data storage.")
-        st.caption("Data powered by CoinGecko API")
+        st.caption("Multi-grid crypto trading bot with automated order management and risk controls.")
+        st.caption("Data: Bybit API v5 + CoinGecko")
 
 if __name__ == "__main__":
     main()
