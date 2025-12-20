@@ -124,7 +124,18 @@ async def start_grid(symbol: str, background_tasks: BackgroundTasks):
     if symbol not in grid_engine.grids:
         raise HTTPException(status_code=404, detail=f"Grid not found: {symbol}")
     
+    if risk_manager and risk_manager.kill_switch.triggered:
+        raise HTTPException(status_code=403, detail=f"Kill switch active: {risk_manager.kill_switch.reason}")
+    
     await grid_engine.update_price(symbol)
+    
+    if risk_manager:
+        state = grid_engine.grids[symbol]
+        can_trade, reason = risk_manager.should_trade(symbol, state.current_price)
+        if not can_trade:
+            return {"status": "blocked", "symbol": symbol, "reason": reason}
+        risk_manager.record_api_request(True)
+    
     result = await grid_engine.place_grid_orders(symbol)
     
     return {"status": "started", "symbol": symbol, "result": result}
@@ -204,6 +215,10 @@ async def get_prices():
     await ingestion_service.fetch_all_prices()
     prices = ingestion_service.get_all_cached_prices()
     
+    if risk_manager:
+        for symbol, data in prices.items():
+            risk_manager.record_price(symbol, data.price)
+    
     return {
         symbol: {
             "price": data.price,
@@ -221,10 +236,24 @@ async def tradingview_alert(payload: AlertPayload, request: Request):
         raise HTTPException(status_code=503, detail="Services not initialized")
     
     signature = request.headers.get("X-Webhook-Signature", "")
+    body = await request.body()
+    
+    if alert_handler.webhook_secret and not alert_handler.validate_webhook(body.decode(), signature):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    
+    if risk_manager and risk_manager.kill_switch.triggered:
+        raise HTTPException(status_code=403, detail=f"Kill switch active: {risk_manager.kill_switch.reason}")
     
     alert = alert_handler.parse_alert(payload.dict())
     if not alert:
         raise HTTPException(status_code=400, detail="Failed to parse alert")
+    
+    if risk_manager:
+        price = ingestion_service.get_cached_price(alert.symbol)
+        if price:
+            can_trade, reason = risk_manager.should_trade(alert.symbol, price.price)
+            if not can_trade:
+                return {"alert": alert.symbol, "blocked": True, "reason": reason}
     
     action = alert_handler.get_action_for_grid(alert)
     result = {"alert": alert.symbol, "action": action}
