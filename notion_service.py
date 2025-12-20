@@ -11,8 +11,19 @@ def get_access_token():
     
     if connection_settings and connection_settings.get('settings', {}).get('expires_at'):
         expires_at = connection_settings['settings']['expires_at']
-        if datetime.fromisoformat(expires_at.replace('Z', '+00:00')) > datetime.now():
-            return connection_settings['settings']['access_token']
+        try:
+            if expires_at.endswith('Z'):
+                expires_at = expires_at[:-1] + '+00:00'
+            parsed_expiry = datetime.fromisoformat(expires_at)
+            if parsed_expiry.tzinfo:
+                from datetime import timezone
+                now = datetime.now(timezone.utc)
+            else:
+                now = datetime.now()
+            if parsed_expiry > now:
+                return connection_settings['settings']['access_token']
+        except (ValueError, TypeError):
+            pass
     
     hostname = os.environ.get('REPLIT_CONNECTORS_HOSTNAME')
     repl_identity = os.environ.get('REPL_IDENTITY')

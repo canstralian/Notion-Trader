@@ -43,8 +43,10 @@ class BybitClient:
         self._ws_callbacks: Dict[str, List[Callable]] = {}
         self._running = False
     
+    RECV_WINDOW_MS = "5000"
+    
     def _generate_signature(self, timestamp: int, params: Dict) -> str:
-        param_str = str(timestamp) + self.api_key + "5000"
+        param_str = str(timestamp) + self.api_key + self.RECV_WINDOW_MS
         if params:
             param_str += "&".join([f"{k}={v}" for k, v in sorted(params.items())])
         return hmac.new(
@@ -60,7 +62,7 @@ class BybitClient:
             "X-BAPI-API-KEY": self.api_key,
             "X-BAPI-SIGN": signature,
             "X-BAPI-TIMESTAMP": str(timestamp),
-            "X-BAPI-RECV-WINDOW": "5000",
+            "X-BAPI-RECV-WINDOW": self.RECV_WINDOW_MS,
             "Content-Type": "application/json"
         }
     

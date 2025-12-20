@@ -7,7 +7,7 @@ from typing import Dict, Optional
 
 try:
     from notion_service import NotionTradeService
-except:
+except ImportError:
     NotionTradeService = None
 
 from crypto_api import (
@@ -181,7 +181,7 @@ def get_api_status() -> Dict:
         response = requests.get("http://localhost:8000/api/status", timeout=2)
         if response.status_code == 200:
             return response.json()
-    except:
+    except (requests.RequestException, requests.Timeout):
         pass
     return None
 
@@ -511,9 +511,11 @@ def main():
         st.divider()
         
         st.markdown("### Capital Allocation")
+        total_capital = 0
         for symbol, config in DEFAULT_GRID_CONFIGS.items():
             st.caption(f"{symbol}: ${config.total_investment:,.0f}")
-        st.caption(f"**Total: $34,000**")
+            total_capital += config.total_investment
+        st.caption(f"**Total: ${total_capital:,.0f}**")
         
         st.divider()
         

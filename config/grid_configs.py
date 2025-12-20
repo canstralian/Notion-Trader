@@ -28,6 +28,8 @@ class GridParameters:
         return prices
     
     def get_quantity_at_price(self, price: float) -> float:
+        if price <= 0:
+            return 0.0
         return self.investment_per_grid / price
 
 DEFAULT_GRID_CONFIGS: Dict[str, GridParameters] = {

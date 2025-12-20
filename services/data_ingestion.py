@@ -58,17 +58,26 @@ class DataIngestionService:
                 )
                 self._price_cache[symbol] = data
                 return data
+            else:
+                logger.warning(f"No price data returned for {symbol}")
         except Exception as e:
-            logger.error(f"Error fetching price for {symbol}: {e}")
+            logger.error(f"Error fetching price for {symbol}: {e}", exc_info=True)
         return None
     
     async def fetch_all_prices(self) -> Dict[str, PriceData]:
         tasks = [self.fetch_price(symbol) for symbol in self._symbols]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        for result in results:
+        failed_symbols = []
+        for i, result in enumerate(results):
             if isinstance(result, PriceData):
                 await self._notify_subscribers(result)
+            elif isinstance(result, Exception):
+                failed_symbols.append(self._symbols[i])
+                logger.error(f"Failed to fetch {self._symbols[i]}: {result}")
+        
+        if failed_symbols:
+            logger.warning(f"Price fetch failed for: {', '.join(failed_symbols)}")
         
         return self._price_cache
     
