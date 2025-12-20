@@ -41,4 +41,3 @@ externalPort = 80
 [userenv]
 
 [userenv.shared]
-COINGECKO_KEY = "CG-LHebx9soH3JpBY5EyHxhhZGG"
