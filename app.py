@@ -27,144 +27,294 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    
-    * {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    
-    .main {
-        background-color: #FFFFFF;
-    }
-    
-    .stApp {
-        background-color: #FFFFFF;
-    }
-    
-    .metric-card {
-        background-color: #F7F6F3;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 8px 0;
-        border: 1px solid #E8E7E4;
-    }
-    
-    .metric-label {
-        color: #37352F;
-        font-size: 14px;
-        font-weight: 500;
-        margin-bottom: 4px;
-    }
-    
-    .metric-value {
-        color: #000000;
-        font-size: 28px;
-        font-weight: 600;
-    }
-    
-    .metric-delta-positive {
-        color: #0F7B6C;
-        font-size: 14px;
-    }
-    
-    .metric-delta-negative {
-        color: #E03E3E;
-        font-size: 14px;
-    }
-    
-    .section-header {
-        color: #000000;
-        font-size: 20px;
-        font-weight: 600;
-        margin: 24px 0 16px 0;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #E8E7E4;
-    }
-    
-    .grid-card {
-        background-color: #F7F6F3;
-        border-radius: 8px;
-        padding: 16px;
-        margin: 8px 0;
-        border: 1px solid #E8E7E4;
-    }
-    
-    .status-running {
-        color: #0F7B6C;
-        font-weight: 600;
-    }
-    
-    .status-stopped {
-        color: #E03E3E;
-        font-weight: 600;
-    }
-    
-    .status-paused {
-        color: #FFB02E;
-        font-weight: 600;
-    }
-    
-    .buy-badge {
-        background-color: rgba(15, 123, 108, 0.1);
-        color: #0F7B6C;
-        padding: 4px 12px;
-        border-radius: 4px;
-        font-weight: 500;
-        font-size: 12px;
-    }
-    
-    .sell-badge {
-        background-color: rgba(224, 62, 62, 0.1);
-        color: #E03E3E;
-        padding: 4px 12px;
-        border-radius: 4px;
-        font-weight: 500;
-        font-size: 12px;
-    }
-    
-    .stButton > button {
-        background-color: #2EAADC;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 8px 16px;
-        font-weight: 500;
-        transition: background-color 0.2s;
-    }
-    
-    .stButton > button:hover {
-        background-color: #2596BE;
-    }
-    
-    .danger-button > button {
-        background-color: #E03E3E !important;
-    }
-    
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: transparent;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background-color: #F7F6F3;
-        border-radius: 6px;
-        padding: 8px 16px;
-        color: #37352F;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background-color: #2EAADC !important;
-        color: white !important;
-    }
-    
-    div[data-testid="stMetricValue"] {
-        font-size: 24px;
-        font-weight: 600;
-    }
-</style>
-""", unsafe_allow_html=True)
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
+
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "Dashboard"
+
+def get_theme_css():
+    if st.session_state.dark_mode:
+        return """
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .main {
+            background-color: #1E1E1E;
+            color: #E0E0E0;
+        }
+        
+        .stApp {
+            background-color: #1E1E1E;
+            color: #E0E0E0;
+        }
+        
+        .metric-card {
+            background-color: #2D2D2D;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 8px 0;
+            border: 1px solid #3D3D3D;
+            color: #E0E0E0;
+        }
+        
+        .metric-label {
+            color: #B0B0B0;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .metric-value {
+            color: #E0E0E0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        .metric-delta-positive {
+            color: #4ADB9F;
+            font-size: 14px;
+        }
+        
+        .metric-delta-negative {
+            color: #FF6B6B;
+            font-size: 14px;
+        }
+        
+        .section-header {
+            color: #E0E0E0;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 24px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #3D3D3D;
+        }
+        
+        .grid-card {
+            background-color: #2D2D2D;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+            border: 1px solid #3D3D3D;
+            color: #E0E0E0;
+        }
+        
+        .status-running {
+            color: #4ADB9F;
+            font-weight: 600;
+        }
+        
+        .status-stopped {
+            color: #FF6B6B;
+            font-weight: 600;
+        }
+        
+        .status-paused {
+            color: #FFD93D;
+            font-weight: 600;
+        }
+        
+        .buy-badge {
+            background-color: rgba(74, 219, 159, 0.2);
+            color: #4ADB9F;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 12px;
+        }
+        
+        .sell-badge {
+            background-color: rgba(255, 107, 107, 0.2);
+            color: #FF6B6B;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 12px;
+        }
+        
+        .stButton > button {
+            background-color: #2E96DC;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        
+        .stButton > button:hover {
+            background-color: #2980B9;
+        }
+        
+        .danger-button > button {
+            background-color: #FF6B6B !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background-color: transparent;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background-color: #2D2D2D;
+            border-radius: 6px;
+            padding: 8px 16px;
+            color: #B0B0B0;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background-color: #2E96DC !important;
+            color: white !important;
+        }
+        
+        div[data-testid="stMetricValue"] {
+            font-size: 24px;
+            font-weight: 600;
+            color: #E0E0E0;
+        }
+        """
+    else:
+        return """
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .main {
+            background-color: #FFFFFF;
+        }
+        
+        .stApp {
+            background-color: #FFFFFF;
+        }
+        
+        .metric-card {
+            background-color: #F7F6F3;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 8px 0;
+            border: 1px solid #E8E7E4;
+        }
+        
+        .metric-label {
+            color: #37352F;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .metric-value {
+            color: #000000;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        .metric-delta-positive {
+            color: #0F7B6C;
+            font-size: 14px;
+        }
+        
+        .metric-delta-negative {
+            color: #E03E3E;
+            font-size: 14px;
+        }
+        
+        .section-header {
+            color: #000000;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 24px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #E8E7E4;
+        }
+        
+        .grid-card {
+            background-color: #F7F6F3;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+            border: 1px solid #E8E7E4;
+        }
+        
+        .status-running {
+            color: #0F7B6C;
+            font-weight: 600;
+        }
+        
+        .status-stopped {
+            color: #E03E3E;
+            font-weight: 600;
+        }
+        
+        .status-paused {
+            color: #FFB02E;
+            font-weight: 600;
+        }
+        
+        .buy-badge {
+            background-color: rgba(15, 123, 108, 0.1);
+            color: #0F7B6C;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 12px;
+        }
+        
+        .sell-badge {
+            background-color: rgba(224, 62, 62, 0.1);
+            color: #E03E3E;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 12px;
+        }
+        
+        .stButton > button {
+            background-color: #2EAADC;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        
+        .stButton > button:hover {
+            background-color: #2596BE;
+        }
+        
+        .danger-button > button {
+            background-color: #E03E3E !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background-color: transparent;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background-color: #F7F6F3;
+            border-radius: 6px;
+            padding: 8px 16px;
+            color: #37352F;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background-color: #2EAADC !important;
+            color: white !important;
+        }
+        
+        div[data-testid="stMetricValue"] {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        """
+
+st.markdown(f"<style>{get_theme_css()}</style>", unsafe_allow_html=True)
 
 @st.cache_resource
 def get_grid_engine():
@@ -435,52 +585,40 @@ def render_notion_trades():
     except Exception as e:
         st.error(f"Notion error: {e}")
 
-def main():
-    st.title("🤖 Crypto Trading Bot")
-    st.caption("Multi-grid automated trading system with risk management")
-    
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Dashboard", "Controls", "Grids", "Market", "Settings"])
-    
-    with tab1:
-        render_risk_dashboard()
-        render_grid_status()
-        render_pnl_summary()
-    
-    with tab2:
-        render_controls()
-    
-    with tab3:
-        render_grid_config()
-    
-    with tab4:
-        render_market_overview()
+def render_sidebar_navigation():
+    with st.sidebar:
+        st.markdown("## 🤖 Trading Bot")
         
-        st.markdown('<div class="section-header">Trending Coins</div>', unsafe_allow_html=True)
-        trending = get_trending_coins()
-        if trending:
-            cols = st.columns(5)
-            for idx, coin in enumerate(trending[:5]):
-                with cols[idx]:
-                    st.markdown(f"**{coin.get('name', 'Unknown')}**")
-                    st.caption(coin.get('symbol', ''))
-    
-    with tab5:
-        st.markdown('<div class="section-header">System Settings</div>', unsafe_allow_html=True)
-        
-        st.subheader("Risk Thresholds")
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([3, 1])
         with col1:
-            st.number_input("Max Drawdown %", value=RISK_THRESHOLDS['max_drawdown_percent'], disabled=True)
-            st.number_input("Max API Error Rate %", value=RISK_THRESHOLDS['max_api_error_rate'], disabled=True)
+            st.caption("Navigation")
         with col2:
-            st.number_input("Volatility Breaker Count", value=RISK_THRESHOLDS['volatility_breaker_count'], disabled=True)
-            st.number_input("Max Position Size %", value=RISK_THRESHOLDS['max_position_size_percent'], disabled=True)
+            theme_icon = "🌙" if st.session_state.dark_mode else "☀️"
+            if st.button(theme_icon, key="theme_toggle", help="Toggle dark/light mode"):
+                st.session_state.dark_mode = not st.session_state.dark_mode
+                st.rerun()
         
         st.divider()
         
-        render_notion_trades()
-    
-    with st.sidebar:
+        pages = {
+            "📊 Dashboard": "Dashboard",
+            "🎛️ Controls": "Controls",
+            "⚙️ Grids": "Grids",
+            "📈 Market": "Market",
+            "⚡ Settings": "Settings",
+        }
+        
+        for page_label, page_name in pages.items():
+            if st.button(
+                page_label,
+                use_container_width=True,
+                type="primary" if st.session_state.current_page == page_name else "secondary"
+            ):
+                st.session_state.current_page = page_name
+                st.rerun()
+        
+        st.divider()
+        
         st.markdown("### System Status")
         
         api_status = get_api_status()
@@ -522,6 +660,51 @@ def main():
         st.markdown("### About")
         st.caption("Multi-grid crypto trading bot with automated order management and risk controls.")
         st.caption("Data: Bybit API v5 + CoinGecko")
+
+def main():
+    st.title("🤖 Crypto Trading Bot")
+    st.caption("Multi-grid automated trading system with risk management")
+    
+    render_sidebar_navigation()
+    
+    if st.session_state.current_page == "Dashboard":
+        render_risk_dashboard()
+        render_grid_status()
+        render_pnl_summary()
+    
+    elif st.session_state.current_page == "Controls":
+        render_controls()
+    
+    elif st.session_state.current_page == "Grids":
+        render_grid_config()
+    
+    elif st.session_state.current_page == "Market":
+        render_market_overview()
+        
+        st.markdown('<div class="section-header">Trending Coins</div>', unsafe_allow_html=True)
+        trending = get_trending_coins()
+        if trending:
+            cols = st.columns(5)
+            for idx, coin in enumerate(trending[:5]):
+                with cols[idx]:
+                    st.markdown(f"**{coin.get('name', 'Unknown')}**")
+                    st.caption(coin.get('symbol', ''))
+    
+    elif st.session_state.current_page == "Settings":
+        st.markdown('<div class="section-header">System Settings</div>', unsafe_allow_html=True)
+        
+        st.subheader("Risk Thresholds")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.number_input("Max Drawdown %", value=RISK_THRESHOLDS['max_drawdown_percent'], disabled=True)
+            st.number_input("Max API Error Rate %", value=RISK_THRESHOLDS['max_api_error_rate'], disabled=True)
+        with col2:
+            st.number_input("Volatility Breaker Count", value=RISK_THRESHOLDS['volatility_breaker_count'], disabled=True)
+            st.number_input("Max Position Size %", value=RISK_THRESHOLDS['max_position_size_percent'], disabled=True)
+        
+        st.divider()
+        
+        render_notion_trades()
 
 if __name__ == "__main__":
     main()
