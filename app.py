@@ -173,16 +173,19 @@ def get_notion_service():
         service = NotionTradeService()
         try:
             service.connect()
-            service.find_or_create_databases()
+            force_create = st.session_state.get('force_create_databases', False)
+            service.find_or_create_databases(force_create=force_create)
             st.session_state['notion_service'] = service
+            st.session_state['force_create_databases'] = False
         except Exception as e:
             st.error(f"Failed to connect to Notion: {e}")
             return NotionTradeService()
     return st.session_state['notion_service']
 
-def reset_notion_service():
+def reset_notion_service(force_create: bool = False):
     if 'notion_service' in st.session_state:
         del st.session_state['notion_service']
+    st.session_state['force_create_databases'] = force_create
 
 def render_market_overview():
     st.markdown('<div class="section-header">Market Overview</div>', unsafe_allow_html=True)
@@ -446,7 +449,11 @@ def main():
             st.rerun()
         
         if st.button("Reset Notion Connection", use_container_width=True):
-            reset_notion_service()
+            reset_notion_service(force_create=False)
+            st.rerun()
+        
+        if st.button("Create New Databases", use_container_width=True, type="secondary"):
+            reset_notion_service(force_create=True)
             st.rerun()
         
         st.divider()

@@ -61,38 +61,83 @@ class NotionTradeService:
         self.client = get_notion_client()
         return True
     
-    def find_or_create_databases(self):
+    def query_database(self, database_id: str, **kwargs) -> Dict:
+        """Query a Notion database using the SDK."""
+        if not database_id:
+            raise Exception("No database ID provided - databases may not be initialized")
+        
+        if hasattr(self.client.data_sources, 'query'):
+            return self.client.data_sources.query(data_source_id=database_id, **kwargs)
+        elif hasattr(self.client.databases, 'query'):
+            return self.client.databases.query(database_id=database_id, **kwargs)
+        else:
+            return self.client.request(
+                path=f"v1/databases/{database_id}/query",
+                method="POST",
+                body=kwargs if kwargs else {}
+            )
+    
+    def _validate_database_schema(self, db_id: str, required_props: List[str]) -> bool:
+        """Check if a database has the required properties."""
+        try:
+            db = self.client.databases.retrieve(database_id=db_id)
+            properties = db.get('properties', {})
+            has_all = all(prop in properties for prop in required_props)
+            return has_all
+        except Exception as e:
+            return False
+    
+    def find_or_create_databases(self, force_create: bool = False):
         if not self.client:
             self.connect()
         
+        if force_create:
+            self.trades_db_id = None
+            self.portfolio_db_id = None
+            self.strategies_db_id = None
+        
+        trades_props = ['Trade', 'Coin', 'Type', 'Price', 'Quantity', 'Total', 'Date', 'Status']
+        portfolio_props = ['Holding', 'Coin', 'Quantity', 'Avg Buy Price', 'Total Invested']
+        strategies_props = ['Strategy', 'Description', 'Target Coins', 'Risk Level', 'Status']
+        
         search_results = self.client.search()
         
-        for item in search_results.get('results', []):
-            if item.get('object') == 'database':
-                title = item.get('title', [{}])[0].get('plain_text', '') if item.get('title') else ''
-                if title == 'Crypto Trades':
-                    self.trades_db_id = item['id']
-                elif title == 'Crypto Portfolio':
-                    self.portfolio_db_id = item['id']
-                elif title == 'Trading Strategies':
-                    self.strategies_db_id = item['id']
+        if not force_create:
+            for item in search_results.get('results', []):
+                if item.get('object') == 'database':
+                    title = item.get('title', [{}])[0].get('plain_text', '') if item.get('title') else ''
+                    db_id = item['id']
+                    if title == 'Crypto Trades' and not self.trades_db_id:
+                        if self._validate_database_schema(db_id, trades_props):
+                            self.trades_db_id = db_id
+                    elif title == 'Crypto Portfolio' and not self.portfolio_db_id:
+                        if self._validate_database_schema(db_id, portfolio_props):
+                            self.portfolio_db_id = db_id
+                    elif title == 'Trading Strategies' and not self.strategies_db_id:
+                        if self._validate_database_schema(db_id, strategies_props):
+                            self.strategies_db_id = db_id
         
         parent_page_id = None
         
         for item in search_results.get('results', []):
             if item.get('object') == 'page':
-                if item.get('parent', {}).get('type') == 'workspace':
-                    parent_page_id = item['id']
-                    break
+                parent_page_id = item['id']
+                break
         
         if not parent_page_id:
-            new_page = self.client.pages.create(
-                parent={"type": "workspace", "workspace": True},
-                properties={
-                    "title": [{"type": "text", "text": {"content": "Crypto Trading"}}]
-                }
-            )
-            parent_page_id = new_page['id']
+            try:
+                new_page = self.client.pages.create(
+                    parent={"workspace": True},
+                    properties={
+                        "title": {"title": [{"text": {"content": "Crypto Trading"}}]}
+                    }
+                )
+                parent_page_id = new_page['id']
+            except Exception:
+                pass
+        
+        if not parent_page_id:
+            raise Exception("Could not find or create a parent page for databases. Please create a page in Notion first.")
         
         if not self.trades_db_id:
             trades_db = self.client.databases.create(
@@ -217,8 +262,8 @@ class NotionTradeService:
         if not self.portfolio_db_id:
             return
         
-        results = self.client.data_sources.query(
-            data_source_id=self.portfolio_db_id,
+        results = self.query_database(
+            self.portfolio_db_id,
             filter={"property": "Coin", "select": {"equals": coin}}
         )
         
@@ -270,19 +315,19 @@ class NotionTradeService:
             return []
         
         try:
-            results = self.client.data_sources.query(
-                data_source_id=self.trades_db_id,
+            results = self.query_database(
+                self.trades_db_id,
                 sorts=[{"property": "Date", "direction": "descending"}],
                 page_size=limit
             )
         except Exception as e:
-            if "Could not find" in str(e):
+            if "Could not find" in str(e) or "object_not_found" in str(e):
                 self.trades_db_id = None
                 self.find_or_create_databases()
                 if not self.trades_db_id:
                     return []
-                results = self.client.data_sources.query(
-                    data_source_id=self.trades_db_id,
+                results = self.query_database(
+                    self.trades_db_id,
                     sorts=[{"property": "Date", "direction": "descending"}],
                     page_size=limit
                 )
@@ -314,14 +359,14 @@ class NotionTradeService:
             return []
         
         try:
-            results = self.client.data_sources.query(data_source_id=self.portfolio_db_id)
+            results = self.query_database(self.portfolio_db_id)
         except Exception as e:
-            if "Could not find" in str(e):
+            if "Could not find" in str(e) or "object_not_found" in str(e):
                 self.portfolio_db_id = None
                 self.find_or_create_databases()
                 if not self.portfolio_db_id:
                     return []
-                results = self.client.data_sources.query(data_source_id=self.portfolio_db_id)
+                results = self.query_database(self.portfolio_db_id)
             else:
                 raise
         
@@ -345,7 +390,7 @@ class NotionTradeService:
         if not self.portfolio_db_id:
             return
         
-        results = self.client.data_sources.query(data_source_id=self.portfolio_db_id)
+        results = self.query_database(self.portfolio_db_id)
         
         for page in results.get('results', []):
             props = page['properties']
@@ -375,14 +420,14 @@ class NotionTradeService:
             return []
         
         try:
-            results = self.client.data_sources.query(data_source_id=self.strategies_db_id)
+            results = self.query_database(self.strategies_db_id)
         except Exception as e:
-            if "Could not find" in str(e):
+            if "Could not find" in str(e) or "object_not_found" in str(e):
                 self.strategies_db_id = None
                 self.find_or_create_databases()
                 if not self.strategies_db_id:
                     return []
-                results = self.client.data_sources.query(data_source_id=self.strategies_db_id)
+                results = self.query_database(self.strategies_db_id)
             else:
                 raise
         
