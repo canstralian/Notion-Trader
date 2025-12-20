@@ -562,6 +562,135 @@ def render_pnl_summary():
     if data:
         st.dataframe(pd.DataFrame(data), use_container_width=True, hide_index=True)
 
+def render_workflow_diagram():
+    st.markdown('<div class="section-header">Trading System Workflow</div>', unsafe_allow_html=True)
+    
+    is_dark = st.session_state.dark_mode
+    
+    bg_color = "#2D2D2D" if is_dark else "#F7F6F3"
+    border_color = "#3D3D3D" if is_dark else "#E8E7E4"
+    text_color = "#E0E0E0" if is_dark else "#37352F"
+    accent_color = "#2EAADC"
+    arrow_color = "#4ADB9F" if is_dark else "#0F7B6C"
+    
+    st.markdown(f"""
+    <div style="
+        background: {bg_color};
+        border: 1px solid {border_color};
+        border-radius: 12px;
+        padding: 24px;
+        margin: 16px 0;
+    ">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <!-- Grid Sage Analysis -->
+            <div style="
+                background: linear-gradient(135deg, {accent_color}, #2596BE);
+                color: white;
+                padding: 16px 32px;
+                border-radius: 8px;
+                font-weight: 600;
+                text-align: center;
+                min-width: 280px;
+                box-shadow: 0 4px 12px rgba(46, 170, 220, 0.3);
+            ">
+                🧠 Grid Sage<br/>
+                <span style="font-size: 12px; font-weight: 400;">Analysis Engine</span>
+            </div>
+            
+            <div style="color: {arrow_color}; font-size: 24px;">↓</div>
+            
+            <!-- Signal Generation -->
+            <div style="
+                background: {bg_color};
+                border: 2px solid {accent_color};
+                color: {text_color};
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 500;
+                text-align: center;
+            ">
+                ⚡ Signal Generation
+            </div>
+            
+            <div style="color: {arrow_color}; font-size: 24px;">↓</div>
+            
+            <!-- Notion Trader -->
+            <div style="
+                background: linear-gradient(135deg, #0F7B6C, #0D6B5E);
+                color: white;
+                padding: 16px 32px;
+                border-radius: 8px;
+                font-weight: 600;
+                text-align: center;
+                min-width: 280px;
+                box-shadow: 0 4px 12px rgba(15, 123, 108, 0.3);
+            ">
+                📊 Notion Trader<br/>
+                <span style="font-size: 12px; font-weight: 400;">Execution & Tracking</span>
+            </div>
+            
+            <div style="color: {arrow_color}; font-size: 24px;">↓</div>
+            
+            <!-- Performance Feedback -->
+            <div style="
+                background: {bg_color};
+                border: 2px solid #FFB02E;
+                color: {text_color};
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 500;
+                text-align: center;
+            ">
+                📈 Performance Feedback
+            </div>
+            
+            <div style="color: {arrow_color}; font-size: 24px;">↓</div>
+            
+            <!-- Strategy Refinement -->
+            <div style="
+                background: linear-gradient(135deg, #9B59B6, #8E44AD);
+                color: white;
+                padding: 16px 32px;
+                border-radius: 8px;
+                font-weight: 600;
+                text-align: center;
+                min-width: 280px;
+                box-shadow: 0 4px 12px rgba(155, 89, 182, 0.3);
+            ">
+                🔄 Grid Sage<br/>
+                <span style="font-size: 12px; font-weight: 400;">Strategy Refinement</span>
+            </div>
+        </div>
+        
+        <div style="
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid {border_color};
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 12px;
+        ">
+            <div style="text-align: center; color: {text_color};">
+                <div style="font-size: 20px;">🎯</div>
+                <div style="font-size: 11px;">Market Analysis</div>
+            </div>
+            <div style="text-align: center; color: {text_color};">
+                <div style="font-size: 20px;">📡</div>
+                <div style="font-size: 11px;">Real-time Data</div>
+            </div>
+            <div style="text-align: center; color: {text_color};">
+                <div style="font-size: 20px;">🔒</div>
+                <div style="font-size: 11px;">Risk Controls</div>
+            </div>
+            <div style="text-align: center; color: {text_color};">
+                <div style="font-size: 20px;">📝</div>
+                <div style="font-size: 11px;">Trade Logging</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 def render_notion_trades():
     st.markdown('<div class="section-header">Notion Trade Log (Legacy)</div>', unsafe_allow_html=True)
     
@@ -668,6 +797,7 @@ def main():
     render_sidebar_navigation()
     
     if st.session_state.current_page == "Dashboard":
+        render_workflow_diagram()
         render_risk_dashboard()
         render_grid_status()
         render_pnl_summary()
