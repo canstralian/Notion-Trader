@@ -439,27 +439,27 @@ def render_controls():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        if st.button("Start All Grids", use_container_width=True):
+        if st.button("Start All Grids", width='stretch'):
             for symbol in DEFAULT_GRID_CONFIGS:
                 call_api(f"/api/grids/{symbol}/start", "POST")
             st.success("Started all grids")
             st.rerun()
     
     with col2:
-        if st.button("Pause All", use_container_width=True):
+        if st.button("Pause All", width='stretch'):
             call_api("/api/pause", "POST")
             st.info("Paused all grids")
             st.rerun()
     
     with col3:
-        if st.button("Resume All", use_container_width=True):
+        if st.button("Resume All", width='stretch'):
             call_api("/api/resume", "POST")
             st.success("Resumed all grids")
             st.rerun()
     
     with col4:
         st.markdown('<div class="danger-button">', unsafe_allow_html=True)
-        if st.button("KILL SWITCH", use_container_width=True, type="primary"):
+        if st.button("KILL SWITCH", width='stretch', type="primary"):
             call_api("/api/kill", "POST")
             st.error("KILL SWITCH ACTIVATED - All trading stopped")
             st.rerun()
@@ -475,11 +475,11 @@ def render_controls():
             st.caption(symbol)
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("Start", key=f"start_{symbol}", use_container_width=True):
+                if st.button("Start", key=f"start_{symbol}", width='stretch'):
                     call_api(f"/api/grids/{symbol}/start", "POST")
                     st.rerun()
             with c2:
-                if st.button("Pause", key=f"pause_{symbol}", use_container_width=True):
+                if st.button("Pause", key=f"pause_{symbol}", width='stretch'):
                     call_api(f"/api/pause/{symbol}", "POST")
                     st.rerun()
 
@@ -505,7 +505,7 @@ def render_market_overview():
             with cols[idx]:
                 price = prices.get(coin, 0)
                 data = market_data.get(coin, {})
-                change = data.get('price_change_24h', 0)
+                change = data.get('change_24h', 0)
                 
                 st.metric(
                     coin,
@@ -569,7 +569,7 @@ def render_pnl_summary():
         st.metric("Total Sells", total_sells)
     
     if data:
-        st.dataframe(pd.DataFrame(data), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(data), width='stretch', hide_index=True)
 
 def render_workflow_diagram():
     st.markdown('<div class="section-header">Trading System Workflow</div>', unsafe_allow_html=True)
@@ -758,7 +758,7 @@ def render_sidebar_navigation():
         for page_label, page_name in pages.items():
             if st.button(
                 page_label,
-                use_container_width=True,
+                width='stretch',
                 type="primary" if st.session_state.current_page == page_name else "secondary"
             ):
                 st.session_state.current_page = page_name
@@ -784,11 +784,11 @@ def render_sidebar_navigation():
         
         st.markdown("### Quick Actions")
         
-        if st.button("Refresh Data", use_container_width=True):
+        if st.button("Refresh Data", width='stretch'):
             st.cache_data.clear()
             st.rerun()
         
-        if st.button("Rebalance All", use_container_width=True):
+        if st.button("Rebalance All", width='stretch'):
             call_api("/api/rebalance", "POST")
             st.success("Rebalanced")
             st.rerun()
