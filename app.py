@@ -62,35 +62,37 @@ def get_theme_css():
         }
         
         .metric-label {
-            color: #B0B0B0;
+            color: #D0D0D0;
             font-size: 14px;
             font-weight: 500;
             margin-bottom: 4px;
         }
         
         .metric-value {
-            color: #E0E0E0;
+            color: #FFFFFF;
             font-size: 28px;
             font-weight: 600;
         }
         
         .metric-delta-positive {
-            color: #4ADB9F;
+            color: #5FE3B1;
             font-size: 14px;
+            font-weight: 500;
         }
         
         .metric-delta-negative {
-            color: #FF6B6B;
+            color: #FF7F7F;
             font-size: 14px;
+            font-weight: 500;
         }
         
         .section-header {
-            color: #E0E0E0;
+            color: #FFFFFF;
             font-size: 20px;
             font-weight: 600;
             margin: 24px 0 16px 0;
             padding-bottom: 8px;
-            border-bottom: 1px solid #3D3D3D;
+            border-bottom: 2px solid #404040;
         }
         
         .grid-card {
@@ -99,40 +101,42 @@ def get_theme_css():
             padding: 16px;
             margin: 8px 0;
             border: 1px solid #3D3D3D;
-            color: #E0E0E0;
+            color: #FFFFFF;
         }
         
         .status-running {
-            color: #4ADB9F;
+            color: #5FE3B1;
             font-weight: 600;
         }
         
         .status-stopped {
-            color: #FF6B6B;
+            color: #FF7F7F;
             font-weight: 600;
         }
         
         .status-paused {
-            color: #FFD93D;
+            color: #FFD966;
             font-weight: 600;
         }
         
         .buy-badge {
-            background-color: rgba(74, 219, 159, 0.2);
-            color: #4ADB9F;
+            background-color: rgba(95, 227, 177, 0.15);
+            color: #5FE3B1;
             padding: 4px 12px;
             border-radius: 4px;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 12px;
+            border: 1px solid rgba(95, 227, 177, 0.3);
         }
         
         .sell-badge {
-            background-color: rgba(255, 107, 107, 0.2);
-            color: #FF6B6B;
+            background-color: rgba(255, 127, 127, 0.15);
+            color: #FF7F7F;
             padding: 4px 12px;
             border-radius: 4px;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 12px;
+            border: 1px solid rgba(255, 127, 127, 0.3);
         }
         
         .stButton > button {
@@ -201,35 +205,37 @@ def get_theme_css():
         }
         
         .metric-label {
-            color: #37352F;
+            color: #4A4A47;
             font-size: 14px;
             font-weight: 500;
             margin-bottom: 4px;
         }
         
         .metric-value {
-            color: #000000;
+            color: #1A1A1A;
             font-size: 28px;
             font-weight: 600;
         }
         
         .metric-delta-positive {
-            color: #0F7B6C;
+            color: #046B54;
             font-size: 14px;
+            font-weight: 500;
         }
         
         .metric-delta-negative {
-            color: #E03E3E;
+            color: #C41E1E;
             font-size: 14px;
+            font-weight: 500;
         }
         
         .section-header {
-            color: #000000;
+            color: #1A1A1A;
             font-size: 20px;
             font-weight: 600;
             margin: 24px 0 16px 0;
             padding-bottom: 8px;
-            border-bottom: 1px solid #E8E7E4;
+            border-bottom: 2px solid #D0CFCC;
         }
         
         .grid-card {
@@ -238,39 +244,42 @@ def get_theme_css():
             padding: 16px;
             margin: 8px 0;
             border: 1px solid #E8E7E4;
+            color: #1A1A1A;
         }
         
         .status-running {
-            color: #0F7B6C;
+            color: #046B54;
             font-weight: 600;
         }
         
         .status-stopped {
-            color: #E03E3E;
+            color: #C41E1E;
             font-weight: 600;
         }
         
         .status-paused {
-            color: #FFB02E;
+            color: #B8860B;
             font-weight: 600;
         }
         
         .buy-badge {
-            background-color: rgba(15, 123, 108, 0.1);
-            color: #0F7B6C;
+            background-color: rgba(4, 107, 84, 0.12);
+            color: #046B54;
             padding: 4px 12px;
             border-radius: 4px;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 12px;
+            border: 1px solid rgba(4, 107, 84, 0.25);
         }
         
         .sell-badge {
-            background-color: rgba(224, 62, 62, 0.1);
-            color: #E03E3E;
+            background-color: rgba(196, 30, 30, 0.12);
+            color: #C41E1E;
             padding: 4px 12px;
             border-radius: 4px;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 12px;
+            border: 1px solid rgba(196, 30, 30, 0.25);
         }
         
         .stButton > button {
@@ -568,10 +577,19 @@ def render_workflow_diagram():
     is_dark = st.session_state.dark_mode
     
     bg_color = "#2D2D2D" if is_dark else "#F7F6F3"
-    border_color = "#3D3D3D" if is_dark else "#E8E7E4"
-    text_color = "#E0E0E0" if is_dark else "#37352F"
-    accent_color = "#2EAADC"
-    arrow_color = "#4ADB9F" if is_dark else "#0F7B6C"
+    border_color = "#404040" if is_dark else "#D0CFCC"
+    text_color = "#FFFFFF" if is_dark else "#1A1A1A"
+    subtitle_color = "#D0D0D0" if is_dark else "#4A4A47"
+    arrow_color = "#5FE3B1" if is_dark else "#046B54"
+    
+    gradient1_start = "#2E96DC" if is_dark else "#1B6BA8"
+    gradient1_end = "#2175B8" if is_dark else "#1A5A94"
+    
+    gradient2_start = "#15A085" if is_dark else "#0D5A47"
+    gradient2_end = "#0E8B6E" if is_dark else "#0B4838"
+    
+    gradient3_start = "#A855A8" if is_dark else "#7B2E8C"
+    gradient3_end = "#9333B6" if is_dark else "#6B2376"
     
     st.markdown(f"""
     <div style="
@@ -584,81 +602,81 @@ def render_workflow_diagram():
         <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
             <!-- Grid Sage Analysis -->
             <div style="
-                background: linear-gradient(135deg, {accent_color}, #2596BE);
+                background: linear-gradient(135deg, {gradient1_start}, {gradient1_end});
                 color: white;
                 padding: 16px 32px;
                 border-radius: 8px;
-                font-weight: 600;
+                font-weight: 700;
                 text-align: center;
                 min-width: 280px;
-                box-shadow: 0 4px 12px rgba(46, 170, 220, 0.3);
+                box-shadow: 0 4px 12px rgba(46, 150, 220, 0.4);
             ">
                 🧠 Grid Sage<br/>
-                <span style="font-size: 12px; font-weight: 400;">Analysis Engine</span>
+                <span style="font-size: 12px; font-weight: 500;">Analysis Engine</span>
             </div>
             
-            <div style="color: {arrow_color}; font-size: 24px;">↓</div>
+            <div style="color: {arrow_color}; font-size: 24px; font-weight: 700;">↓</div>
             
             <!-- Signal Generation -->
             <div style="
                 background: {bg_color};
-                border: 2px solid {accent_color};
+                border: 2px solid {arrow_color};
                 color: {text_color};
                 padding: 12px 24px;
                 border-radius: 8px;
-                font-weight: 500;
+                font-weight: 600;
                 text-align: center;
             ">
                 ⚡ Signal Generation
             </div>
             
-            <div style="color: {arrow_color}; font-size: 24px;">↓</div>
+            <div style="color: {arrow_color}; font-size: 24px; font-weight: 700;">↓</div>
             
             <!-- Notion Trader -->
             <div style="
-                background: linear-gradient(135deg, #0F7B6C, #0D6B5E);
+                background: linear-gradient(135deg, {gradient2_start}, {gradient2_end});
                 color: white;
                 padding: 16px 32px;
                 border-radius: 8px;
-                font-weight: 600;
+                font-weight: 700;
                 text-align: center;
                 min-width: 280px;
-                box-shadow: 0 4px 12px rgba(15, 123, 108, 0.3);
+                box-shadow: 0 4px 12px rgba(21, 160, 133, 0.4);
             ">
                 📊 Notion Trader<br/>
-                <span style="font-size: 12px; font-weight: 400;">Execution & Tracking</span>
+                <span style="font-size: 12px; font-weight: 500;">Execution & Tracking</span>
             </div>
             
-            <div style="color: {arrow_color}; font-size: 24px;">↓</div>
+            <div style="color: {arrow_color}; font-size: 24px; font-weight: 700;">↓</div>
             
             <!-- Performance Feedback -->
             <div style="
                 background: {bg_color};
-                border: 2px solid #FFB02E;
+                border: 2px solid #FFD966;
                 color: {text_color};
                 padding: 12px 24px;
                 border-radius: 8px;
-                font-weight: 500;
+                font-weight: 600;
                 text-align: center;
             ">
                 📈 Performance Feedback
             </div>
             
-            <div style="color: {arrow_color}; font-size: 24px;">↓</div>
+            <div style="color: {arrow_color}; font-size: 24px; font-weight: 700;">↓</div>
             
             <!-- Strategy Refinement -->
             <div style="
-                background: linear-gradient(135deg, #9B59B6, #8E44AD);
+                background: linear-gradient(135deg, {gradient3_start}, {gradient3_end});
                 color: white;
                 padding: 16px 32px;
                 border-radius: 8px;
-                font-weight: 600;
+                font-weight: 700;
                 text-align: center;
                 min-width: 280px;
-                box-shadow: 0 4px 12px rgba(155, 89, 182, 0.3);
+                box-shadow: 0 4px 12px rgba(168, 85, 168, 0.4);
             ">
-                🔄 Grid Sage<br/>
-                <span style="font-size: 12px; font-weight: 400;">Strategy Refinement</span>
+                🔄 Strategy Refinement<br/>
+                <span style="font-size: 12px; font-weight: 500;">Grid Sage Learns</span>
             </div>
         </div>
         
@@ -673,19 +691,19 @@ def render_workflow_diagram():
         ">
             <div style="text-align: center; color: {text_color};">
                 <div style="font-size: 20px;">🎯</div>
-                <div style="font-size: 11px;">Market Analysis</div>
+                <div style="font-size: 11px; font-weight: 500; color: {subtitle_color};">Market Analysis</div>
             </div>
             <div style="text-align: center; color: {text_color};">
                 <div style="font-size: 20px;">📡</div>
-                <div style="font-size: 11px;">Real-time Data</div>
+                <div style="font-size: 11px; font-weight: 500; color: {subtitle_color};">Real-time Data</div>
             </div>
             <div style="text-align: center; color: {text_color};">
                 <div style="font-size: 20px;">🔒</div>
-                <div style="font-size: 11px;">Risk Controls</div>
+                <div style="font-size: 11px; font-weight: 500; color: {subtitle_color};">Risk Controls</div>
             </div>
             <div style="text-align: center; color: {text_color};">
                 <div style="font-size: 20px;">📝</div>
-                <div style="font-size: 11px;">Trade Logging</div>
+                <div style="font-size: 11px; font-weight: 500; color: {subtitle_color};">Trade Logging</div>
             </div>
         </div>
     </div>
